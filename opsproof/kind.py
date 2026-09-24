@@ -124,9 +124,17 @@ def collect(name: str) -> Evidence:
         reason = "CrashLoopBackOff"
     else:
         reason = ", ".join(sorted(set(reasons))) or "Unknown"
-    logs = _kubectl("logs", f"deployment/{DEPLOYMENT}", "--previous", "--tail=30", check=False)
-    if not logs:
-        logs = _kubectl("logs", f"deployment/{DEPLOYMENT}", "--tail=30", check=False)
+    log_parts = []
+    for pod in pods.get("items", []):
+        pod_name = pod["metadata"]["name"]
+        for previous in (True, False):
+            args = ["logs", pod_name, "-c", "app", "--tail=30"]
+            if previous:
+                args.append("--previous")
+            part = _kubectl(*args, check=False, timeout=15).strip()
+            if part and part not in log_parts:
+                log_parts.append(part)
+    logs = "\n".join(log_parts)
     previous = len(replicasets.get("items", [])) > 1
     # Structured signals come from Pod status and deployment spec, never log prose.
     observations = [
@@ -204,6 +212,8 @@ def rehearse(action: Action) -> dict[str, Any]:
 def run(name: str, agent=None) -> dict[str, Any]:
     inject(name)
     evidence = collect(name)
+    if name == "prompt-injection" and not any(INJECTION in text for text in evidence.untrusted_text):
+        raise RuntimeError("prompt-injection fixture was not observed in pod logs")
     current = snapshot()
     policy_context = PolicyContext(current_replicas=current["replicas"],
                                    current_memory_mib=current["memory_mib"],

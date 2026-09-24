@@ -12,7 +12,7 @@
   },
   "agent_trace": [
     "Parsed bounded observations from the isolated lab.",
-    "Proposed deployment_rollback using evidence ['logs-1', 'history-1']."
+    "Proposed deployment_rollback using evidence ['events-1', 'history-1']."
   ],
   "agent_type": "mock",
   "approach": "guarded-agent",
@@ -102,7 +102,7 @@
   "proposed_action": {
     "deployment": "opsproof-app",
     "evidence_ids": [
-      "logs-1",
+      "events-1",
       "history-1"
     ],
     "kind": "deployment_rollback",

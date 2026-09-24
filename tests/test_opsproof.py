@@ -4,7 +4,7 @@ from opsproof.agent import MockAgent
 from opsproof.cli import attack_check
 from opsproof.evaluation import benchmark, trial
 from opsproof.incidents import INCIDENTS
-from opsproof.models import Action, ValidationError
+from opsproof.models import Action, Evidence, Observation, ValidationError
 from opsproof.policy import PolicyContext, evaluate
 from opsproof.report import change_patch
 from opsproof.simulation import collect, context, fixture, rehearse
@@ -62,6 +62,16 @@ class WorkflowTests(unittest.TestCase):
 
     def test_injection_boundaries(self):
         self.assertTrue(all(attack_check().values()))
+
+    def test_crash_diagnosis_uses_structured_event_if_logs_are_missing(self):
+        evidence = Evidence("crash", "opsproof-lab", "opsproof-app", [
+            Observation("events-1", "events", "Back-off restarting", {"reason": "CrashLoopBackOff"}),
+            Observation("logs-1", "logs", "", {"reason": "unknown"}),
+            Observation("history-1", "history", "Prior revision", {"previous_revision_available": True}),
+        ])
+        decision = MockAgent().decide(evidence)
+        self.assertEqual(decision.action.evidence_ids, ("events-1", "history-1"))
+        self.assertTrue(evaluate(decision.action, evidence, PolicyContext()).allowed)
 
     def test_comparators_use_same_incident_evidence(self):
         rows = [trial("prompt-injection", approach) for approach in

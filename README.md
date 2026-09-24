@@ -80,7 +80,7 @@ Store those reports separately from mock results. API use is optional and may in
 
 ## What was verified and what remains
 
-Nine automated tests passed locally, `attack-check` passed, and the four offline scenarios plus 36 benchmark trials completed. Kind execution could not be verified on the authoring machine because Docker, Kind, and kubectl were absent. CI runs the offline checks and a separate Kind integration job on Ubuntu; its status and evidence artifact should be checked before relying on Kind measurements. No Kind recovery time or real-model success rate is claimed in the numbers above.
+Ten automated tests passed locally, `attack-check` passed, and the four offline scenarios plus 36 benchmark trials completed. Kind execution could not be verified on the authoring machine because Docker, Kind, and kubectl were absent. CI runs the offline checks and a separate Kind integration job on Ubuntu; its status and evidence artifact should be checked before relying on Kind measurements. No Kind recovery time or real-model success rate is claimed in the numbers above.
 
 The lab has one deployment and a simple readiness oracle. It does not assess multi-service dependencies, production SLOs, or whether a proposed resource change is cost effective. The collector attempts `kubectl top`; without metrics-server it records the configured memory limit and restart count and marks live usage unavailable. The model adapter's quality and prompt-injection resistance are unmeasured until real-model trials are run.
 
