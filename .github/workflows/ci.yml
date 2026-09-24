@@ -1,0 +1,29 @@
+name: CI
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
+      - name: Injection and scope gates
+        run: python -m opsproof attack-check
+      - name: Offline demo and benchmark
+        run: python -m opsproof demo --backend simulation --out reports/generated
+      - name: Verify report and benchmark structure
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path('reports/generated')
+          data = json.loads((root / 'benchmark.json').read_text())
+          assert data['agent_type'] == 'mock'
+          assert len(data['trials']) == 36
+          assert all(json.loads((root / f'{name}.json').read_text())['recovery'] for name in ('bad-image','crash','oom','prompt-injection'))
+          PY

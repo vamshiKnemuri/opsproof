@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: opsproof-lab
+  labels:
+    app.kubernetes.io/part-of: opsproof
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opsproof-app
+  namespace: opsproof-lab
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app: opsproof-app
+  template:
+    metadata:
+      labels:
+        app: opsproof-app
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: app
+          image: opsproof/app:stable
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: OPS_MODE
+              value: normal
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: 20m
+              memory: 16Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            periodSeconds: 2
+            initialDelaySeconds: 1
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            periodSeconds: 5
+            initialDelaySeconds: 2
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opsproof-app
+  namespace: opsproof-lab
+spec:
+  selector:
+    app: opsproof-app
+  ports:
+    - port: 8080
+      targetPort: 8080
