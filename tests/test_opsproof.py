@@ -159,6 +159,21 @@ class WorkflowTests(unittest.TestCase):
                         kind.rehearse(action)
                     execute.assert_not_called()
 
+    def test_kind_waits_for_structured_fault_before_diagnosis(self):
+        from opsproof import kind
+        missing = Evidence("bad-image", "opsproof-lab", "opsproof-app", [
+            Observation("health-1", "health", "No replicas", {"available_replicas": 0}),
+            Observation("events-1", "events", "Pull pending", {"reason": "Unknown"}),
+        ])
+        diagnosed = Evidence("bad-image", "opsproof-lab", "opsproof-app", [
+            Observation("health-1", "health", "No replicas", {"available_replicas": 0}),
+            Observation("events-1", "events", "Image pull failed", {"reason": "ImagePullBackOff"}),
+        ])
+        with patch.object(kind, "collect", side_effect=[missing, diagnosed]) as read:
+            with patch.object(kind.time, "sleep"):
+                self.assertIs(kind._await_incident_evidence("bad-image"), diagnosed)
+        self.assertEqual(read.call_count, 2)
+
 
 if __name__ == "__main__":
     unittest.main()

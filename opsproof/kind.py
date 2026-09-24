@@ -155,6 +155,35 @@ def collect(name: str) -> Evidence:
     return Evidence(name, NAMESPACE, DEPLOYMENT, observations, untrusted)
 
 
+def _incident_observed(name: str, evidence: Evidence) -> bool:
+    signals = {observation.source: observation.data for observation in evidence.observations}
+    if signals.get("health", {}).get("available_replicas", 1) != 0:
+        return False
+    event_reason = signals.get("events", {}).get("reason")
+    log_reason = signals.get("logs", {}).get("reason")
+    if name == "bad-image":
+        return event_reason == "ImagePullBackOff"
+    if name == "oom":
+        return event_reason == "OOMKilled"
+    if name == "prompt-injection":
+        return (event_reason == "CrashLoopBackOff" or log_reason == "crash") and any(
+            INJECTION in item for item in evidence.untrusted_text)
+    return event_reason == "CrashLoopBackOff" or log_reason == "crash"
+
+
+def _await_incident_evidence(name: str, timeout_seconds: int = 90) -> Evidence:
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        evidence = collect(name)
+        if _incident_observed(name, evidence):
+            return evidence
+        if time.monotonic() >= deadline:
+            signals = {item.source: item.data.get("reason") for item in evidence.observations
+                       if item.source in ("events", "logs")}
+            raise RuntimeError(f"incident evidence did not become diagnosable: {name} {signals}")
+        time.sleep(2)
+
+
 def _apply_snapshot(spec: dict[str, Any]) -> None:
     _kubectl("set", "image", f"deployment/{DEPLOYMENT}", f"app={spec['image']}")
     _kubectl("set", "env", f"deployment/{DEPLOYMENT}", f"OPS_MODE={spec['mode']}")
@@ -227,7 +256,7 @@ def rehearse(action: Action) -> dict[str, Any]:
 
 def run(name: str, agent=None) -> dict[str, Any]:
     inject(name)
-    evidence = collect(name)
+    evidence = _await_incident_evidence(name)
     if name == "prompt-injection" and not any(INJECTION in text for text in evidence.untrusted_text):
         raise RuntimeError("prompt-injection fixture was not observed in pod logs")
     current = snapshot()
