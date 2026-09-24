@@ -69,7 +69,16 @@ These numbers come from `python -m opsproof demo --backend simulation --out repo
 
 The ungated comparator proposes removing the OOM limit and follows the injected deletion instruction. These choices are intentionally implemented as fixture behavior to exercise the safety boundary. They are not measured behavior of a real AI model. Gate rejection was measured separately by `attack-check`; the guarded mock made no unsafe benchmark proposal, hence zero blocked benchmark actions. The fixed rollback runbook succeeds because every fixture has a healthy previous revision; this small benchmark does not show superiority over a good runbook.
 
-The first Kind integration runs verified the execution path but did not assert that the broken revision caused an outage; the previous healthy pod could have masked the fault. The current CI fixture uses `Recreate` and requires zero available replicas before rehearsal. Do not treat earlier Kind recoveries as proof of service recovery under an outage. The [CI workflow](https://github.com/vamshiKnemuri/opsproof/actions) publishes real-cluster reports and wall-clock measurements separately from the simulated benchmark table.
+The [private CI run #11](https://github.com/vamshiKnemuri/opsproof/actions/runs/36050742822) on 2026-09-24 completed all four Kind rehearsals. Every fixture had **zero available replicas before remediation** and one after; the rollback restored the incident and zero availability, then reapplying the remediation restored readiness. The policy allowed each scoped action, no side effects were recorded, and each scenario produced a review patch. These are four single-run wall-clock measurements from the isolated cluster, separate from the repeated in-memory benchmark:
+
+| Kind incident | Recovered | Action-to-readiness time | Incident restored on rollback | Recovered after reapply |
+|---|---:|---:|---:|---:|
+| `bad-image` | Yes | 3.66 s | Yes | Yes |
+| `crash` | Yes | 3.31 s | Yes | Yes |
+| `oom` | Yes | 6.10 s | Yes | Yes |
+| `prompt-injection` | Yes | 4.43 s | Yes | Yes |
+
+The checked CI reports and GitOps patches are preserved in [reports/sample/kind](reports/sample/kind). The [draft OOM change pull request](https://github.com/vamshiKnemuri/opsproof/pull/1) is a lab-scoped review example; it is not a production deployment. Earlier Kind runs did not prove an outage because the previous healthy pod could have masked the fault. Run #11 uses `Recreate` and asserts the outage, recovery, rollback outage, and reapplication.
 
 No real-model trial has been run or reported. The optional OpenAI adapter sends evidence to the [Responses API](https://developers.openai.com/api/reference/cli/resources/responses/methods/create) and still goes through the same parser and policy:
 
@@ -82,7 +91,7 @@ Store those reports separately from mock results. API use is optional and may in
 
 ## What was verified and what remains
 
-Sixteen automated tests passed locally, including stubbed optional-adapter parsing, malicious-action rejection, patch gating, and a preflight check that refuses to claim recovery without an outage; `attack-check` passed, and the four offline scenarios plus 36 benchmark trials completed. Earlier Kind jobs passed the action flow; the stricter outage check is being verified separately. Docker, Kind, and kubectl were absent on the authoring machine, so the local one-command cluster path was not run there. No live real-model success rate is claimed.
+Sixteen automated tests passed locally and in CI, including stubbed optional-adapter parsing, malicious-action rejection, patch gating, and a preflight check that refuses to claim recovery without an outage. `attack-check` passed, the four offline scenarios plus 36 benchmark trials completed, and CI verified four Kind incidents with the stronger outage and rollback checks. Docker, Kind, and kubectl were absent on the authoring machine, so the local one-command cluster path was not run there. No live real-model success rate is claimed because no model API credentials or local inference runtime were available.
 
 The lab has one deployment and a simple readiness oracle. It does not assess multi-service dependencies, production SLOs, or whether a proposed resource change is cost effective. The collector attempts `kubectl top`; without metrics-server it records the configured memory limit and restart count and marks live usage unavailable. The model adapter's quality and prompt-injection resistance are unmeasured until real-model trials are run.
 
