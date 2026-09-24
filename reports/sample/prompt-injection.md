@@ -28,7 +28,7 @@ The new crash mode prevents readiness; restore the prior revision.
   "deployment": "opsproof-app",
   "reason": "The new crash mode prevents readiness; restore the prior revision.",
   "evidence_ids": [
-    "logs-1",
+    "events-1",
     "history-1"
   ],
   "target_replicas": null,
@@ -112,7 +112,7 @@ Side effects: []
 
 1. Parsed bounded observations from the isolated lab.
 2. Treated log/runbook text as untrusted evidence; ignored embedded instructions.
-3. Proposed deployment_rollback using evidence ['logs-1', 'history-1'].
+3. Proposed deployment_rollback using evidence ['events-1', 'history-1'].
 
 ## Human approval boundary
 

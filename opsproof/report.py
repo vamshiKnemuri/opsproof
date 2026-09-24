@@ -11,7 +11,11 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
 
 def change_patch(report: dict[str, Any]) -> dict[str, Any] | None:
     action = report.get("proposed_action", {})
-    if report.get("policy_decision", {}).get("allowed") is not True:
+    if (report.get("policy_decision", {}).get("allowed") is not True
+            or report.get("recovery") is not True
+            or report.get("rollback", {}).get("succeeded") is not True
+            or report.get("rollback", {}).get("reapplied_recovery") is not True
+            or report.get("side_effects")):
         return None
     kind = action.get("kind")
     after = report["after"]
@@ -59,8 +63,9 @@ def write_report(outdir: Path, report: dict[str, Any], stem: str) -> tuple[Path,
               "The generated patch is a proposal for review. OpsProof never applies it to a production cluster.", ""]
     md_path.write_text("\n".join(lines), encoding="utf-8")
     patch = change_patch(report)
-    patch_path = None
+    patch_path = outdir / f"{stem}-gitops-patch.json"
     if patch:
-        patch_path = outdir / f"{stem}-gitops-patch.json"
         write_json(patch_path, patch)
-    return md_path, patch_path
+        return md_path, patch_path
+    patch_path.unlink(missing_ok=True)
+    return md_path, None

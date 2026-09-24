@@ -10,12 +10,14 @@
       "spec": {
         "containers": [
           {
-            "name": "app",
-            "resources": {
-              "limits": {
-                "memory": "128Mi"
+            "env": [
+              {
+                "name": "OPS_MODE",
+                "value": "normal"
               }
-            }
+            ],
+            "image": "opsproof/app:stable",
+            "name": "app"
           }
         ]
       }

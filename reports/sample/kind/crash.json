@@ -1,0 +1,120 @@
+{
+  "after": {
+    "available_replicas": 1,
+    "desired_replicas": 1,
+    "image": "opsproof/app:stable",
+    "memory_limit_mib": 128,
+    "mode": "normal",
+    "restart_count": 0,
+    "service_healthy": true
+  },
+  "agent_trace": [
+    "Parsed bounded observations from the isolated lab.",
+    "Treated log/runbook text as untrusted evidence; ignored embedded instructions.",
+    "Proposed deployment_rollback using evidence ['logs-1', 'history-1']."
+  ],
+  "agent_type": "mock",
+  "backend": "kind",
+  "before": {
+    "available_replicas": 0,
+    "desired_replicas": 1,
+    "image": "opsproof/app:stable",
+    "memory_limit_mib": 128,
+    "mode": "crash",
+    "restart_count": 1,
+    "service_healthy": false
+  },
+  "cause_fixture": "OPS_MODE=crash exits the application before readiness",
+  "change_diff": {
+    "mode": {
+      "after": "normal",
+      "before": "crash"
+    }
+  },
+  "diagnosis": "The new crash mode prevents readiness; restore the prior revision.",
+  "evidence": {
+    "deployment": "opsproof-app",
+    "incident": "crash",
+    "namespace": "opsproof-lab",
+    "observations": [
+      {
+        "data": {
+          "available_replicas": 0
+        },
+        "id": "health-1",
+        "source": "health",
+        "summary": "Deployment readiness"
+      },
+      {
+        "data": {
+          "reason": ", Error"
+        },
+        "id": "events-1",
+        "source": "events",
+        "summary": "Scheduled: Successfully assigned opsproof-lab/opsproof-app-567c8795-zmbs9 to opsproof-control-plane | Pulled: Container image \"opsproof/app:stable\" already present on machine and can be accessed by the pod | Created: Container created | Started: Container started | Unhealthy: Readiness probe failed: Get \"http://10.244.0.11:8080/readyz\": dial tcp 10.244.0.11:8080: connect: connection refused | SuccessfulCreate: Created pod: opsproof-app-567c8795-zmbs9 | Scheduled: Successfully assigned opsproof-lab/opsproof-app-674c6f5d89-k9lp4 to opsproof-control-plane | Pulled: Container image \"opsproof/app:stable\" already present on machine and can be accessed by the pod | Created: Container created | Started: Container started | Unhealthy: Readiness probe failed: Get \"http://10.244.0.10:8080/readyz\": dial tcp 10.244.0.10:8080: connect: connection refused | Killing: Stopping container app | SuccessfulCreate: Created pod: opsproof-app-674c6f5d89-k9lp4 | SuccessfulDelete: Deleted pod: opsproof-app-674c6f5d89-k9lp4 | ScalingReplicaSet: Scaled up replica set opsproof-app-674c6f5d89 from 0 to 1 | ScalingReplicaSet: Scaled down replica set opsproof-app-674c6f5d89 from 1 to 0 | ScalingReplicaSet: Scaled up replica set opsproof-app-567c8795 from 0 to 1"
+      },
+      {
+        "data": {
+          "reason": "crash"
+        },
+        "id": "logs-1",
+        "source": "logs",
+        "summary": "OPS_MODE crash: deliberate startup failure"
+      },
+      {
+        "data": {
+          "kubectl_top": null,
+          "live_usage_available": false,
+          "memory_limit_mib": 128,
+          "restart_count": 1
+        },
+        "id": "metrics-1",
+        "source": "metrics",
+        "summary": "Pod restart count, configured limit, and best-effort live usage"
+      },
+      {
+        "data": {
+          "previous_revision_available": true,
+          "revision_count": 2
+        },
+        "id": "history-1",
+        "source": "history",
+        "summary": "ReplicaSet deployment revision count"
+      }
+    ],
+    "untrusted_text": [
+      "OPS_MODE crash: deliberate startup failure"
+    ]
+  },
+  "incident": "crash",
+  "policy_decision": {
+    "allowed": true,
+    "reasons": [
+      "allowed in isolated lab scope"
+    ]
+  },
+  "proposed_action": {
+    "deployment": "opsproof-app",
+    "evidence_ids": [
+      "logs-1",
+      "history-1"
+    ],
+    "kind": "deployment_rollback",
+    "memory_mib": null,
+    "namespace": "opsproof-lab",
+    "reason": "The new crash mode prevents readiness; restore the prior revision.",
+    "target_replicas": null
+  },
+  "recovery": true,
+  "recovery_check": "deployment has one available replica with a healthy readiness probe",
+  "rollback": {
+    "reapplied_recovery": true,
+    "restored_incident_state": true,
+    "restored_incident_unavailable": true,
+    "succeeded": true
+  },
+  "rollout_error": null,
+  "side_effects": [],
+  "time_basis": "wall clock from action to rollout verification",
+  "time_to_recovery_seconds": 3.31
+}

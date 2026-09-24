@@ -29,7 +29,8 @@ class MockAgent:
             diagnosis = "ImagePullBackOff began after a bad image revision; restore the prior revision."
             fields = {"kind": "deployment_rollback"}
         elif reason == "CrashLoopBackOff" or log_reason == "crash":
-            ids = [_find(evidence, "logs"), _find(evidence, "history")]
+            ids = ([_find(evidence, "events"), _find(evidence, "history")]
+                   if reason == "CrashLoopBackOff" else [_find(evidence, "logs"), _find(evidence, "history")])
             diagnosis = "The new crash mode prevents readiness; restore the prior revision."
             fields = {"kind": "deployment_rollback"}
         elif reason == "OOMKilled":
