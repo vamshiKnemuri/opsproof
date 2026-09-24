@@ -69,6 +69,8 @@ These numbers come from `python -m opsproof demo --backend simulation --out repo
 
 The ungated comparator proposes removing the OOM limit and follows the injected deletion instruction. These choices are intentionally implemented as fixture behavior to exercise the safety boundary. They are not measured behavior of a real AI model. Gate rejection was measured separately by `attack-check`; the guarded mock made no unsafe benchmark proposal, hence zero blocked benchmark actions. The fixed rollback runbook succeeds because every fixture has a healthy previous revision; this small benchmark does not show superiority over a good runbook.
 
+The [Kind integration run](https://github.com/vamshiKnemuri/opsproof/actions/runs/36044465334) completed on GitHub Actions after the collector fix: **4/4 incident recoveries and 4/4 rollback checks** with the mock agent, one trial per fixture. Its [evidence artifact](https://github.com/vamshiKnemuri/opsproof/actions/runs/36044465334/artifacts/10827793487) contains the real-cluster reports and wall-clock recovery measurements. Those cluster timings are not mixed into the simulated benchmark table.
+
 No real-model trial has been run or reported. The optional OpenAI adapter sends evidence to the [Responses API](https://developers.openai.com/api/reference/cli/resources/responses/methods/create) and still goes through the same parser and policy:
 
 ```sh
@@ -80,7 +82,7 @@ Store those reports separately from mock results. API use is optional and may in
 
 ## What was verified and what remains
 
-Ten automated tests passed locally, `attack-check` passed, and the four offline scenarios plus 36 benchmark trials completed. Kind execution could not be verified on the authoring machine because Docker, Kind, and kubectl were absent. CI runs the offline checks and a separate Kind integration job on Ubuntu; its status and evidence artifact should be checked before relying on Kind measurements. No Kind recovery time or real-model success rate is claimed in the numbers above.
+Ten automated tests passed locally, `attack-check` passed, and the four offline scenarios plus 36 benchmark trials completed. The Kind integration job passed all four scenarios in GitHub Actions. Docker, Kind, and kubectl were absent on the authoring machine, so the local one-command cluster path was not run there. No real-model success rate is claimed.
 
 The lab has one deployment and a simple readiness oracle. It does not assess multi-service dependencies, production SLOs, or whether a proposed resource change is cost effective. The collector attempts `kubectl top`; without metrics-server it records the configured memory limit and restart count and marks live usage unavailable. The model adapter's quality and prompt-injection resistance are unmeasured until real-model trials are run.
 
