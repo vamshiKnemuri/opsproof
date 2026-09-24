@@ -1,6 +1,8 @@
 import unittest
 import io
 import json
+import tempfile
+from pathlib import Path
 from unittest.mock import patch
 
 from opsproof.agent import MockAgent, OpenAIAdapter
@@ -9,7 +11,7 @@ from opsproof.evaluation import benchmark, trial
 from opsproof.incidents import INCIDENTS
 from opsproof.models import Action, Evidence, Observation, ValidationError
 from opsproof.policy import PolicyContext, evaluate
-from opsproof.report import change_patch
+from opsproof.report import change_patch, write_report
 from opsproof.simulation import collect, context, fixture, rehearse
 
 
@@ -101,6 +103,24 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(patch["metadata"], {"name": "opsproof-app", "namespace": "opsproof-lab"})
         self.assertEqual(patch["spec"]["template"]["spec"]["containers"][0]["resources"]["limits"]["memory"], "128Mi")
 
+    def test_patch_requires_verified_recovery_and_rollback(self):
+        report = trial("oom", "guarded-agent")
+        for key, value in (("recovery", False), ("side_effects", ["unexpected deployment"])):
+            with self.subTest(key=key):
+                self.assertIsNone(change_patch({**report, key: value}))
+        failed = {**report, "rollback": {**report["rollback"], "succeeded": False}}
+        self.assertIsNone(change_patch(failed))
+
+    def test_failed_rerun_removes_stale_review_patch(self):
+        report = trial("oom", "guarded-agent")
+        with tempfile.TemporaryDirectory() as directory:
+            outdir = Path(directory)
+            _, path = write_report(outdir, report, "oom")
+            self.assertTrue(path.exists())
+            _, path = write_report(outdir, {**report, "recovery": False}, "oom")
+            self.assertIsNone(path)
+            self.assertFalse((outdir / "oom-gitops-patch.json").exists())
+
     def test_optional_adapter_parses_response_and_never_bypasses_policy(self):
         evidence = collect(fixture("oom"))
         raw = {"output": [{"content": [{"type": "output_text", "text": json.dumps({
@@ -128,6 +148,16 @@ class WorkflowTests(unittest.TestCase):
             with patch("urllib.request.urlopen", return_value=io.BytesIO(json.dumps(raw).encode())):
                 with self.assertRaises(ValidationError):
                     OpenAIAdapter("test-model").decide(evidence)
+
+    def test_kind_rehearsal_refuses_to_claim_recovery_without_outage(self):
+        from opsproof import kind
+        action = MockAgent().decide(collect(fixture("bad-image"))).action
+        with patch.object(kind, "snapshot", return_value={"image": "opsproof/app:missing"}):
+            with patch.object(kind, "measure", return_value={"service_healthy": True}):
+                with patch.object(kind, "_apply_action") as execute:
+                    with self.assertRaisesRegex(RuntimeError, "did not remove service availability"):
+                        kind.rehearse(action)
+                    execute.assert_not_called()
 
 
 if __name__ == "__main__":

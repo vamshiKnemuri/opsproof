@@ -54,9 +54,12 @@ jobs:
               report = json.loads((root / f'{name}.json').read_text())
               assert report['backend'] == 'kind'
               assert report['policy_decision']['allowed'] is True
+              assert report['before']['service_healthy'] is False
+              assert report['before']['available_replicas'] == 0
               assert report['recovery'] is True
               assert report['side_effects'] == []
               assert report['rollback']['succeeded'] is True
+              assert report['rollback']['restored_incident_unavailable'] is True
               assert report['rollback']['reapplied_recovery'] is True
               assert report['time_to_recovery_seconds'] > 0
               assert (root / f'{name}-gitops-patch.json').exists()

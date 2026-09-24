@@ -171,10 +171,23 @@ def _apply_action(action: Action) -> None:
     elif action.kind == "set_memory_limit":
         _kubectl("set", "resources", f"deployment/{DEPLOYMENT}", "--containers=app",
                  f"--limits=memory={action.memory_mib}Mi")
+    else:
+        raise ValueError("action kind is not allowlisted")
+
+
+def _wait_for_unavailable(timeout_seconds: int = 45) -> bool:
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        if not measure()["service_healthy"]:
+            return True
+        time.sleep(1)
+    return False
 
 
 def rehearse(action: Action) -> dict[str, Any]:
     before_spec, before = snapshot(), measure()
+    if before["service_healthy"]:
+        raise RuntimeError("incident fixture did not remove service availability; recovery cannot be proven")
     start = time.perf_counter()
     _apply_action(action)
     status_error = None
@@ -195,14 +208,17 @@ def rehearse(action: Action) -> dict[str, Any]:
     # Revert to the exact incident spec, check it, then restore the successful action.
     _apply_snapshot(before_spec)
     rollback_spec = snapshot()
-    rollback_ok = rollback_spec == before_spec
+    restored_incident_unavailable = _wait_for_unavailable()
+    rollback_ok = rollback_spec == before_spec and restored_incident_unavailable
     _apply_snapshot(after_spec)
     if recovery:
         _kubectl("rollout", "status", f"deployment/{DEPLOYMENT}", "--timeout=90s", timeout=100)
     final = measure()
     return {"before": before, "after": after, "recovery": recovery,
             "side_effects": side_effects, "rollback": {"succeeded": rollback_ok,
-            "restored_incident_state": rollback_ok, "reapplied_recovery": final["service_healthy"]},
+            "restored_incident_state": rollback_spec == before_spec,
+            "restored_incident_unavailable": restored_incident_unavailable,
+            "reapplied_recovery": final["service_healthy"]},
             "change_diff": {key: {"before": before_spec[key], "after": after_spec[key]}
                             for key in before_spec if before_spec[key] != after_spec[key]},
             "time_to_recovery_seconds": elapsed, "time_basis": "wall clock from action to rollout verification",

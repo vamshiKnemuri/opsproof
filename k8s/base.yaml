@@ -13,6 +13,8 @@ metadata:
 spec:
   replicas: 1
   revisionHistoryLimit: 5
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: opsproof-app

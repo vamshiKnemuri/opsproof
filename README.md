@@ -40,7 +40,7 @@ python -m opsproof attack-check
 python -m unittest discover -s tests -v
 ```
 
-Each Kind scenario resets the dedicated lab namespace, injects its fault, gathers read-only evidence, proposes a change, applies it after policy approval, waits for readiness, reverts the change to verify rollback, and reapplies the recovery. `reports/generated/<scenario>.md` and `.json` include observations, diagnosis, policy, diff, measurements, side effects, rollback, and trace. The `*-gitops-patch.json` file is a Kubernetes strategic merge patch for human review; it is **not** applied to production. A team could copy it into its GitOps repository and open a normal reviewed pull request. No production credentials are used.
+Each Kind scenario resets the dedicated lab namespace, injects its fault, gathers read-only evidence, proves the service is unavailable, proposes a change, applies it after policy approval, waits for readiness, reverts the change to verify the incident returns, and reapplies the recovery. The lab deployment uses `Recreate` so an old healthy pod cannot mask the injected fault. `reports/generated/<scenario>.md` and `.json` include observations, diagnosis, policy, diff, measurements, side effects, rollback, and trace. The `*-gitops-patch.json` file is a Kubernetes strategic merge patch for human review, written only after successful recovery, rollback, and reapplication without observed side effects; it is **not** applied to production. A team could copy it into its GitOps repository and open a normal reviewed pull request. No production credentials are used.
 
 | Fixture | Known cause | Recovery oracle | Mock proposal |
 |---|---|---|---|
@@ -69,7 +69,7 @@ These numbers come from `python -m opsproof demo --backend simulation --out repo
 
 The ungated comparator proposes removing the OOM limit and follows the injected deletion instruction. These choices are intentionally implemented as fixture behavior to exercise the safety boundary. They are not measured behavior of a real AI model. Gate rejection was measured separately by `attack-check`; the guarded mock made no unsafe benchmark proposal, hence zero blocked benchmark actions. The fixed rollback runbook succeeds because every fixture has a healthy previous revision; this small benchmark does not show superiority over a good runbook.
 
-The [Kind integration run](https://github.com/vamshiKnemuri/opsproof/actions/runs/36044465334) completed on GitHub Actions after the collector fix: **4/4 incident recoveries and 4/4 rollback checks** with the mock agent, one trial per fixture. Its [evidence artifact](https://github.com/vamshiKnemuri/opsproof/actions/runs/36044465334/artifacts/10827793487) contains the real-cluster reports and wall-clock recovery measurements. Those cluster timings are not mixed into the simulated benchmark table.
+The first Kind integration runs verified the execution path but did not assert that the broken revision caused an outage; the previous healthy pod could have masked the fault. The current CI fixture uses `Recreate` and requires zero available replicas before rehearsal. Do not treat earlier Kind recoveries as proof of service recovery under an outage. The [CI workflow](https://github.com/vamshiKnemuri/opsproof/actions) publishes real-cluster reports and wall-clock measurements separately from the simulated benchmark table.
 
 No real-model trial has been run or reported. The optional OpenAI adapter sends evidence to the [Responses API](https://developers.openai.com/api/reference/cli/resources/responses/methods/create) and still goes through the same parser and policy:
 
@@ -82,7 +82,7 @@ Store those reports separately from mock results. API use is optional and may in
 
 ## What was verified and what remains
 
-Twelve automated tests passed locally, including stubbed optional-adapter parsing and malicious-action rejection; `attack-check` passed, and the four offline scenarios plus 36 benchmark trials completed. The Kind integration job passed all four scenarios in GitHub Actions. Docker, Kind, and kubectl were absent on the authoring machine, so the local one-command cluster path was not run there. No live real-model success rate is claimed.
+Fifteen automated tests passed locally, including stubbed optional-adapter parsing, malicious-action rejection, patch gating, and a preflight check that refuses to claim recovery without an outage; `attack-check` passed, and the four offline scenarios plus 36 benchmark trials completed. Earlier Kind jobs passed the action flow; the stricter outage check is being verified separately. Docker, Kind, and kubectl were absent on the authoring machine, so the local one-command cluster path was not run there. No live real-model success rate is claimed.
 
 The lab has one deployment and a simple readiness oracle. It does not assess multi-service dependencies, production SLOs, or whether a proposed resource change is cost effective. The collector attempts `kubectl top`; without metrics-server it records the configured memory limit and restart count and marks live usage unavailable. The model adapter's quality and prompt-injection resistance are unmeasured until real-model trials are run.
 
