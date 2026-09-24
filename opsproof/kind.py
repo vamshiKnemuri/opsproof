@@ -115,6 +115,7 @@ def collect(name: str) -> Evidence:
                 reasons.extend(s.get("reason", "") for s in status.values() if isinstance(s, dict))
     event_items = events.get("items", [])
     event_text = " | ".join(f"{e.get('reason', '')}: {e.get('message', '')}" for e in event_items[-20:])
+    top_output = _kubectl("top", "pods", "--containers", check=False, timeout=15).strip()
     if "OOMKilled" in reasons:
         reason = "OOMKilled"
     elif "ImagePullBackOff" in reasons or "ErrImagePull" in reasons or "Failed to pull image" in event_text:
@@ -132,11 +133,11 @@ def collect(name: str) -> Evidence:
         Observation("health-1", "health", "Deployment readiness", {"available_replicas": dep.get("status", {}).get("availableReplicas", 0)}),
         Observation("events-1", "events", event_text[-2000:], {"reason": reason}),
         Observation("logs-1", "logs", logs[-2000:], {"reason": "crash" if "OPS_MODE crash" in logs else "unknown"}),
-        Observation("metrics-1", "metrics", "Pod restart count and configured memory limit; live usage requires metrics-server",
+        Observation("metrics-1", "metrics", "Pod restart count, configured limit, and best-effort live usage",
                     {"memory_limit_mib": spec["memory_mib"],
                      "restart_count": sum(cs.get("restartCount", 0) for p in pods.get("items", [])
                                           for cs in p.get("status", {}).get("containerStatuses", [])),
-                     "live_usage_available": False}),
+                     "live_usage_available": bool(top_output), "kubectl_top": top_output[:1000] if top_output else None}),
         Observation("history-1", "history", "ReplicaSet deployment revision count",
                     {"previous_revision_available": previous, "revision_count": len(replicasets.get("items", []))}),
     ]

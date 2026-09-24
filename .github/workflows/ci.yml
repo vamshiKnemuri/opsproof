@@ -27,3 +27,27 @@ jobs:
           assert len(data['trials']) == 36
           assert all(json.loads((root / f'{name}.json').read_text())['recovery'] for name in ('bad-image','crash','oom','prompt-injection'))
           PY
+  kind-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Create dedicated Kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: opsproof
+          wait: 90s
+      - name: Build image and run four rehearsals
+        run: |
+          python -m opsproof setup
+          python -m opsproof demo --backend kind --out reports/generated
+      - name: Preserve evidence reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kind-evidence
+          path: reports/generated/
+          if-no-files-found: ignore
