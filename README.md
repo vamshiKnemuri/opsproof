@@ -82,7 +82,7 @@ Store those reports separately from mock results. API use is optional and may in
 
 ## What was verified and what remains
 
-Ten automated tests passed locally, `attack-check` passed, and the four offline scenarios plus 36 benchmark trials completed. The Kind integration job passed all four scenarios in GitHub Actions. Docker, Kind, and kubectl were absent on the authoring machine, so the local one-command cluster path was not run there. No real-model success rate is claimed.
+Twelve automated tests passed locally, including stubbed optional-adapter parsing and malicious-action rejection; `attack-check` passed, and the four offline scenarios plus 36 benchmark trials completed. The Kind integration job passed all four scenarios in GitHub Actions. Docker, Kind, and kubectl were absent on the authoring machine, so the local one-command cluster path was not run there. No live real-model success rate is claimed.
 
 The lab has one deployment and a simple readiness oracle. It does not assess multi-service dependencies, production SLOs, or whether a proposed resource change is cost effective. The collector attempts `kubectl top`; without metrics-server it records the configured memory limit and restart count and marks live usage unavailable. The model adapter's quality and prompt-injection resistance are unmeasured until real-model trials are run.
 

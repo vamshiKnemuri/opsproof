@@ -54,6 +54,8 @@ def evaluate(action: Action, evidence: Evidence, context: PolicyContext) -> Poli
     elif action.kind == "set_replicas":
         target = action.target_replicas
         assert target is not None
+        if "health" not in by_source or "available_replicas" not in by_source["health"].data:
+            reasons.append("replica adjustment requires cited readiness evidence")
         if target < context.service_min_replicas or target > 3:
             reasons.append("replica target violates service availability or maximum")
         if abs(target - context.current_replicas) > context.max_replica_delta:
