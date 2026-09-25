@@ -162,7 +162,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertTrue(evaluate(decision.action, evidence, context(fixture("oom"))).allowed)
         request = call.call_args.args[0]
         self.assertEqual(request.full_url, "http://127.0.0.1:11434/api/chat")
-        self.assertEqual(json.loads(request.data)["format"], "json")
+        self.assertEqual(json.loads(request.data)["format"]["type"], "object")
 
     def test_kind_rehearsal_refuses_to_claim_recovery_without_outage(self):
         from opsproof import kind

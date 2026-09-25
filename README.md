@@ -89,19 +89,21 @@ python -m opsproof demo --backend simulation --agent openai --model YOUR_MODEL -
 
 Store those reports separately from mock results. API use is optional and may incur charges. The adapter sets `store=false`; consult your own data-handling policy before sending operational logs to an external model.
 
-A credential-free real-model adapter talks only to a local [Ollama](https://docs.ollama.com/api/chat) server. With Docker running, use the official Ollama image and the 398 MB `qwen2.5:0.5b` instruction model:
+A credential-free real-model adapter talks only to a local [Ollama](https://docs.ollama.com/api/chat) server. With Docker running, use the official Ollama image and the `qwen2.5:1.5b` instruction model:
 
 ```sh
 docker run -d --rm --name opsproof-ollama -p 127.0.0.1:11434:11434 ollama/ollama
-docker exec opsproof-ollama ollama pull qwen2.5:0.5b
-python -m opsproof benchmark --agent ollama --model qwen2.5:0.5b --repeats 3 --out reports/generated/ollama-benchmark.json
+docker exec opsproof-ollama ollama pull qwen2.5:1.5b
+python -m opsproof benchmark --agent ollama --model qwen2.5:1.5b --repeats 3 --out reports/generated/ollama-benchmark.json
 ```
 
 The manually triggered [credential-free model workflow](.github/workflows/local-model.yml) runs the same trial set in GitHub Actions and preserves the model identity and full trial record. Its guarded-agent results must be reported separately from the fixed runbook, the intentionally ungated fixture comparator, and the deterministic mock agent. Model inference uses synthetic lab evidence only; generated text never becomes a command or manifest.
 
+An initial credential-free pilot with `qwen2.5:0.5b` completed in [private workflow run #1](https://github.com/vamshiKnemuri/opsproof/actions/runs/36102041928) on 2026-09-25. The guarded **real-model** approach recovered **0/12** simulated incidents. Its malformed or unsupported actions were blocked **12/12** times; no action reached the simulator, so side effects and rollback attempts were both zero. Several outputs were truncated at the 512-token limit. This is a model failure to satisfy the contract, not a recovery success. The full trial record and model identity are in [reports/sample/local-model](reports/sample/local-model). A larger model and structured response format are being verified separately. The runbook and ungated rows in that record remain scripted fixture comparators, not outputs from `qwen2.5:0.5b`.
+
 ## What was verified and what remains
 
-Seventeen automated tests passed locally, including stubbed OpenAI and local-model adapter parsing, malicious-action rejection, patch gating, and a preflight check that refuses to claim recovery without an outage. The last published main-branch CI run passed sixteen tests; the new test and local-model workflow are being verified separately. `attack-check` passed, the four offline scenarios plus 36 benchmark trials completed, and CI verified four Kind incidents with the stronger outage and rollback checks. Docker, Kind, and kubectl were absent on the authoring machine, so the local one-command cluster path was not run there. No live real-model success rate is claimed until the credential-free workflow completes.
+Seventeen automated tests passed locally and in [private CI run #15](https://github.com/vamshiKnemuri/opsproof/actions/runs/36101995058), including stubbed OpenAI and local-model adapter parsing, malicious-action rejection, patch gating, and a preflight check that refuses to claim recovery without an outage. `attack-check` passed, the four offline scenarios plus 36 benchmark trials completed, and CI verified four Kind incidents with the stronger outage and rollback checks. Docker, Kind, and kubectl were absent on the authoring machine, so the local one-command cluster path was not run there. The first live model result is reported above; the updated 1.5B model trial is pending.
 
 The lab has one deployment and a simple readiness oracle. It does not assess multi-service dependencies, production SLOs, or whether a proposed resource change is cost effective. The collector attempts `kubectl top`; without metrics-server it records the configured memory limit and restart count and marks live usage unavailable. The model adapter's quality and prompt-injection resistance are unmeasured until real-model trials are run.
 
