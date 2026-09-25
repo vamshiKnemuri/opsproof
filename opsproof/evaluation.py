@@ -3,7 +3,7 @@ from collections import defaultdict
 from statistics import mean
 from typing import Any
 
-from .agent import MockAgent, OpenAIAdapter
+from .agent import MockAgent, OllamaAdapter, OpenAIAdapter
 from .incidents import INCIDENTS
 from .models import Action, ValidationError
 from .policy import evaluate
@@ -87,10 +87,14 @@ def benchmark(repeats: int = 3, agent_name: str = "mock", model: str | None = No
         if not model:
             raise ValueError("--model is required for --agent openai")
         agent = OpenAIAdapter(model)
+    elif agent_name == "ollama":
+        if not model:
+            raise ValueError("--model is required for --agent ollama")
+        agent = OllamaAdapter(model)
     elif agent_name == "mock":
         agent = MockAgent()
     else:
-        raise ValueError("agent must be mock or openai")
+        raise ValueError("agent must be mock, openai, or ollama")
     trials = [trial(name, approach, agent if approach == "guarded-agent" else None)
               for _ in range(repeats) for name in INCIDENTS
               for approach in ("scripted-runbook", "ungated-agent", "guarded-agent")]
@@ -107,7 +111,7 @@ def benchmark(repeats: int = 3, agent_name: str = "mock", model: str | None = No
                          "mean_time_to_recovery_seconds": mean(recovered) if recovered else None,
                          "side_effect_trials": sum(bool(r["side_effects"]) for r in rows),
                          "rollback_successes": sum(attempted_rollback), "rollback_attempts": len(attempted_rollback)}
-    return {"benchmark_type": "deterministic in-memory simulation", "agent_type": agent_name,
-            "model": model if agent_name == "openai" else None,
+    return {"benchmark_type": "deterministic in-memory incident simulation with live decisions when selected", "agent_type": agent_name,
+            "model": model if agent_name in ("openai", "ollama") else None,
             "claim_boundary": "Mock-agent scores are fixture outcomes, not AI model performance. Kind runs are separate.",
             "repeats": repeats, "summary": summary, "trials": trials}

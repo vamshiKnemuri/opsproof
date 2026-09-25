@@ -4,7 +4,7 @@
 flowchart LR
     F[Known incident fixture] --> K[Dedicated Kind cluster]
     K --> E[Read-only evidence collector]
-    E --> A[Mock or optional real-model agent]
+    E --> A[Mock, local Ollama, or optional OpenAI agent]
     A --> T[Strict typed action parser]
     T --> P[Deterministic scope and disruption policy]
     P -->|approved| R[Fixed-argv Kind rehearsal]
@@ -24,7 +24,7 @@ The simulator replaces Kind and the executor with in-memory state. It can delibe
 | `incidents.py` | Fault definitions, causes, and recovery oracles |
 | `kind.py` | Dedicated cluster setup, injection, evidence, fixed actions, rehearsal |
 | `simulation.py` | Offline fixture state and no-shell comparative execution |
-| `agent.py` | Deterministic mock and optional Responses API adapter |
+| `agent.py` | Deterministic mock, local Ollama adapter, and optional Responses API adapter |
 | `models.py` | Strict action and evidence types |
 | `policy.py` | Scope, evidence, revision, and disruption validation |
 | `evaluation.py` | Comparable repeated trials and metrics |

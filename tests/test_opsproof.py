@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from opsproof.agent import MockAgent, OpenAIAdapter
+from opsproof.agent import MockAgent, OllamaAdapter, OpenAIAdapter
 from opsproof.cli import attack_check
 from opsproof.evaluation import benchmark, trial
 from opsproof.incidents import INCIDENTS
@@ -148,6 +148,21 @@ class WorkflowTests(unittest.TestCase):
             with patch("urllib.request.urlopen", return_value=io.BytesIO(json.dumps(raw).encode())):
                 with self.assertRaises(ValidationError):
                     OpenAIAdapter("test-model").decide(evidence)
+
+    def test_local_model_adapter_stays_on_loopback_and_uses_policy(self):
+        evidence = collect(fixture("oom"))
+        decision_json = json.dumps({"diagnosis": "OOMKilled at 32 MiB.",
+                                    "action": {"kind": "set_memory_limit", "namespace": "opsproof-lab",
+                                               "deployment": "opsproof-app", "reason": "OOMKilled at the 32 MiB limit",
+                                               "evidence_ids": ["events-1", "metrics-1"], "memory_mib": 128},
+                                    "trace": ["Used cited OOM and limit signals."]})
+        response = {"message": {"content": decision_json}}
+        with patch("urllib.request.urlopen", return_value=io.BytesIO(json.dumps(response).encode())) as call:
+            decision = OllamaAdapter("test-local-model").decide(evidence)
+        self.assertTrue(evaluate(decision.action, evidence, context(fixture("oom"))).allowed)
+        request = call.call_args.args[0]
+        self.assertEqual(request.full_url, "http://127.0.0.1:11434/api/chat")
+        self.assertEqual(json.loads(request.data)["format"], "json")
 
     def test_kind_rehearsal_refuses_to_claim_recovery_without_outage(self):
         from opsproof import kind

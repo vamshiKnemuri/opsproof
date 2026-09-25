@@ -3,7 +3,7 @@ import argparse
 import json
 from pathlib import Path
 
-from .agent import MockAgent, OpenAIAdapter
+from .agent import MockAgent, OllamaAdapter, OpenAIAdapter
 from .evaluation import benchmark, trial
 from .incidents import INCIDENTS
 from .models import Action, ValidationError
@@ -13,7 +13,11 @@ from .simulation import collect, context, fixture
 
 
 def _agent(args):
-    return OpenAIAdapter(args.model) if args.agent == "openai" else MockAgent()
+    if args.agent == "openai":
+        return OpenAIAdapter(args.model)
+    if args.agent == "ollama":
+        return OllamaAdapter(args.model)
+    return MockAgent()
 
 
 def _scenario(name: str, backend: str, agent) -> dict:
@@ -22,7 +26,7 @@ def _scenario(name: str, backend: str, agent) -> dict:
         return run(name, agent)
     item = trial(name, "guarded-agent", agent)
     item["backend"] = "simulation"
-    item["agent_type"] = "mock" if isinstance(agent, MockAgent) else "openai"
+    item["agent_type"] = "mock" if isinstance(agent, MockAgent) else ("ollama" if isinstance(agent, OllamaAdapter) else "openai")
     item["cause_fixture"] = INCIDENTS[name].cause
     item["recovery_check"] = INCIDENTS[name].recovery_check
     return item
@@ -58,17 +62,17 @@ def main(argv=None) -> int:
     scenario = sub.add_parser("scenario", help="Run one incident and write evidence artifacts")
     scenario.add_argument("name", choices=INCIDENTS)
     scenario.add_argument("--backend", choices=("kind", "simulation"), default="kind")
-    scenario.add_argument("--agent", choices=("mock", "openai"), default="mock")
+    scenario.add_argument("--agent", choices=("mock", "openai", "ollama"), default="mock")
     scenario.add_argument("--model")
     scenario.add_argument("--out", type=Path, default=Path("reports/generated"))
     demo = sub.add_parser("demo", help="Run all fixtures and the simulator benchmark")
     demo.add_argument("--backend", choices=("kind", "simulation"), default="kind")
-    demo.add_argument("--agent", choices=("mock", "openai"), default="mock")
+    demo.add_argument("--agent", choices=("mock", "openai", "ollama"), default="mock")
     demo.add_argument("--model")
     demo.add_argument("--out", type=Path, default=Path("reports/generated"))
     bench = sub.add_parser("benchmark", help="Repeat all four fixtures for three simulated approaches")
     bench.add_argument("--repeats", type=int, default=3)
-    bench.add_argument("--agent", choices=("mock", "openai"), default="mock")
+    bench.add_argument("--agent", choices=("mock", "openai", "ollama"), default="mock")
     bench.add_argument("--model")
     bench.add_argument("--out", type=Path, default=Path("reports/generated/benchmark.json"))
     sub.add_parser("attack-check", help="Verify injection and scope gate controls")

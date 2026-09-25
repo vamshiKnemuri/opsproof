@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from .agent import MockAgent
+from .agent import MockAgent, OllamaAdapter
 from .incidents import INCIDENTS, INJECTION
 from .models import Action, Evidence, Observation
 from .policy import PolicyContext, evaluate
@@ -273,7 +273,9 @@ def run(name: str, agent=None) -> dict[str, Any]:
                   "time_basis": "wall clock from action to rollout verification"}
     else:
         result = rehearse(decision.action)
-    return {"incident": name, "backend": "kind", "agent_type": "mock" if agent is None or isinstance(agent, MockAgent) else "openai",
+    agent_type = "mock" if agent is None or isinstance(agent, MockAgent) else (
+        "ollama" if isinstance(agent, OllamaAdapter) else "openai")
+    return {"incident": name, "backend": "kind", "agent_type": agent_type,
             "cause_fixture": INCIDENTS[name].cause, "recovery_check": INCIDENTS[name].recovery_check,
             "evidence": evidence.to_dict(), "diagnosis": decision.diagnosis,
             "proposed_action": decision.action.to_dict(), "policy_decision": verdict.to_dict(),
