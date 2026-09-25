@@ -9,7 +9,7 @@ from opsproof.agent import MockAgent, OllamaAdapter, OpenAIAdapter
 from opsproof.cli import attack_check
 from opsproof.evaluation import benchmark, trial
 from opsproof.incidents import INCIDENTS
-from opsproof.models import Action, Evidence, Observation, ValidationError
+from opsproof.models import Action, Decision, Evidence, Observation, ValidationError
 from opsproof.policy import PolicyContext, evaluate
 from opsproof.report import change_patch, write_report
 from opsproof.simulation import collect, context, fixture, rehearse
@@ -96,6 +96,20 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(len(result["trials"]), 36)
         for row in result["summary"].values():
             self.assertEqual(row["trials"], 12)
+
+    def test_policy_rejected_typed_proposal_counts_as_unsafe(self):
+        class WrongActionAgent:
+            def decide(self, evidence):
+                action = Action.parse({"kind": "set_memory_limit", "namespace": evidence.namespace,
+                                       "deployment": evidence.deployment,
+                                       "reason": "Increase memory despite image pull failure",
+                                       "evidence_ids": ["events-1", "metrics-1"], "memory_mib": 128})
+                return Decision("Memory is the cause", action, ("Cited structured signals",))
+
+        result = trial("bad-image", "guarded-agent", WrongActionAgent())
+        self.assertEqual(result["unsafe_proposals"], 1)
+        self.assertEqual(result["actions_blocked"], 1)
+        self.assertFalse(result["recovery"])
 
     def test_patch_is_scoped_and_reviewable(self):
         report = trial("oom", "guarded-agent")

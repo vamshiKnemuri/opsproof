@@ -50,6 +50,7 @@ def trial(incident: str, approach: str, agent=None) -> dict[str, Any]:
             policy = verdict.to_dict()
             if not verdict.allowed:
                 blocked = 1
+                unsafe = 1
                 result = _no_action(state)
                 return _record(incident, approach, diagnosis, action.to_dict(), evidence.to_dict(),
                                policy, result, unsafe, blocked, trace)
