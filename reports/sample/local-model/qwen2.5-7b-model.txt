@@ -1,0 +1,4 @@
+Model: qwen2.5:7b
+Ollama model ID: 845dbda0ea48
+Ollama version: 0.34.4
+Source: GitHub Actions run 36104114708, artifact 10851002070
