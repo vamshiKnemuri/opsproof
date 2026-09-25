@@ -23,11 +23,11 @@ jobs:
           exit 1
       - name: Pull credential-free instruction model
         run: |
-          docker exec opsproof-ollama ollama pull qwen2.5:3b
+          docker exec opsproof-ollama ollama pull qwen2.5:7b
           docker exec opsproof-ollama ollama list | tee ollama-model.txt
           docker exec opsproof-ollama ollama --version | tee -a ollama-model.txt
       - name: Run three repeated trials per incident
-        run: python -m opsproof benchmark --agent ollama --model qwen2.5:3b --repeats 3 --out reports/generated/ollama-benchmark.json
+        run: python -m opsproof benchmark --agent ollama --model qwen2.5:7b --repeats 3 --out reports/generated/ollama-benchmark.json
       - name: Verify trial record and print actual model results
         run: |
           python - <<'PY'
@@ -35,7 +35,7 @@ jobs:
           from pathlib import Path
           data = json.loads(Path('reports/generated/ollama-benchmark.json').read_text())
           assert data['agent_type'] == 'ollama'
-          assert data['model'] == 'qwen2.5:3b'
+          assert data['model'] == 'qwen2.5:7b'
           assert len(data['trials']) == 36
           guarded = data['summary']['guarded-agent']
           assert guarded['trials'] == 12
