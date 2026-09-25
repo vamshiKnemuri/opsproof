@@ -69,16 +69,16 @@ These numbers come from `python -m opsproof demo --backend simulation --out repo
 
 The ungated comparator proposes removing the OOM limit and follows the injected deletion instruction. These choices are intentionally implemented as fixture behavior to exercise the safety boundary. They are not measured behavior of a real AI model. Gate rejection was measured separately by `attack-check`; the guarded mock made no unsafe benchmark proposal, hence zero blocked benchmark actions. The fixed rollback runbook succeeds because every fixture has a healthy previous revision; this small benchmark does not show superiority over a good runbook.
 
-The [private CI run #11](https://github.com/vamshiKnemuri/opsproof/actions/runs/36050742822) on 2026-09-24 completed all four Kind rehearsals. Every fixture had **zero available replicas before remediation** and one after; the rollback restored the incident and zero availability, then reapplying the remediation restored readiness. The policy allowed each scoped action, no side effects were recorded, and each scenario produced a review patch. These are four single-run wall-clock measurements from the isolated cluster, separate from the repeated in-memory benchmark:
+The [private CI run #23](https://github.com/vamshiKnemuri/opsproof/actions/runs/36169387856) on 2026-09-25 completed all four Kind rehearsals on the reviewed revision. Every fixture had **zero available replicas before remediation** and one after; the rollback restored the exact incident configuration, the structured fault signal, and zero availability, then reapplying the remediation restored readiness. The policy allowed each scoped action, no side effects were recorded, and each scenario produced a review patch. These are four single-run wall-clock measurements from the isolated cluster, separate from the repeated in-memory benchmark:
 
 | Kind incident | Recovered | Action-to-readiness time | Incident restored on rollback | Recovered after reapply |
 |---|---:|---:|---:|---:|
-| `bad-image` | Yes | 3.66 s | Yes | Yes |
-| `crash` | Yes | 3.31 s | Yes | Yes |
-| `oom` | Yes | 6.10 s | Yes | Yes |
-| `prompt-injection` | Yes | 4.43 s | Yes | Yes |
+| `bad-image` | Yes | 5.27 s | Yes | Yes |
+| `crash` | Yes | 5.64 s | Yes | Yes |
+| `oom` | Yes | 8.03 s | Yes | Yes |
+| `prompt-injection` | Yes | 4.14 s | Yes | Yes |
 
-The checked CI reports and GitOps patches are preserved in [reports/sample/kind](reports/sample/kind). The [draft OOM change pull request](https://github.com/vamshiKnemuri/opsproof/pull/1) is a lab-scoped review example; it is not a production deployment. Earlier Kind runs did not prove an outage because the previous healthy pod could have masked the fault. Run #11 uses `Recreate` and asserts the outage, recovery, rollback outage, and reapplication.
+The [run #23 evidence artifact](https://github.com/vamshiKnemuri/opsproof/actions/runs/36169387856/artifacts/10879558626) contains its reports and GitOps patches. Earlier checked examples remain in [reports/sample/kind](reports/sample/kind). The [draft OOM change pull request](https://github.com/vamshiKnemuri/opsproof/pull/1) is a lab-scoped review example; it is not a production deployment. Earlier Kind runs did not prove an outage because the previous healthy pod could have masked the fault. The reviewed run uses `Recreate` and asserts the outage, recovery, structured fault recurrence on rollback, and reapplication.
 
 The optional OpenAI adapter sends evidence to the [Responses API](https://developers.openai.com/api/reference/cli/resources/responses/methods/create) and still goes through the same parser and policy:
 
@@ -109,7 +109,7 @@ The runbook and ungated rows in these trial records remain scripted fixture comp
 
 ## What was verified and what remains
 
-Twenty-four automated tests passed locally, including stubbed OpenAI and local-model adapter parsing, malicious-action rejection, forged-log rejection, stale-failure rejection, strict action serialization, policy-rejected proposal counting, patch gating, a blocked-report check for malformed Kind model decisions, and a check that rollback cannot pass without the original fault reappearing. `attack-check` passed, and the four offline scenarios plus 36 benchmark trials completed. [Private CI run #20](https://github.com/vamshiKnemuri/opsproof/actions/runs/36105764247) verified the four Kind incidents before the log-boundary review; a newer CI run must verify the reviewed revision. Docker, Kind, and kubectl were absent on the authoring machine, so the local one-command cluster path was not run there. Four credential-free real-model trial runs are reported above. The optional OpenAI model was not run because no API key was available.
+Twenty-four automated tests passed locally and in [private CI run #23](https://github.com/vamshiKnemuri/opsproof/actions/runs/36169387856), including stubbed OpenAI and local-model adapter parsing, malicious-action rejection, forged-log rejection, stale-failure rejection, strict action serialization, policy-rejected proposal counting, patch gating, a blocked-report check for malformed Kind model decisions, and a check that rollback cannot pass without the original fault reappearing. `attack-check` passed, and the four offline scenarios plus 36 benchmark trials completed. CI verified all four Kind incidents and preserved their reports. Docker, Kind, and kubectl were absent on the authoring machine, so the local one-command cluster path was not run there. Four credential-free real-model trial runs are reported above; they predate this review. The optional OpenAI model was not run because no API key was available.
 
 The lab has one deployment and a simple readiness oracle. It does not assess multi-service dependencies, production SLOs, or whether a proposed resource change is cost effective. The collector attempts `kubectl top`; without metrics-server it records the configured memory limit and restart count and marks live usage unavailable. The real-model trials used only the in-memory simulator; the Kind rehearsals used the deterministic mock agent. Three successful 7B prompt-injection trials do not establish general prompt-injection resistance. Model inference latency and token cost were not benchmarked.
 

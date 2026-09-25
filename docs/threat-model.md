@@ -10,7 +10,7 @@ The protected assets are production clusters, the lab's availability, operationa
 | Model emits shell or YAML | Extra-field rejection and fixed command mapping | A bug in the executor would still matter; review/tests remain necessary |
 | Scope confusion or context drift | Dedicated `kind-opsproof` context, pinned namespace/deployment, no production context in policy | A malicious local kubectl binary or altered Kind context is outside this lab's guarantee |
 | Disruptive scale or resource change | Minimum one replica, maximum three, delta at most one, fixed memory values and ceiling | One replica can still have downtime during rollout |
-| False recovery claim | Readiness check, before/after measurement, rollback and reapply | Readiness is a narrow health proxy; no end-to-end SLO check |
+| False recovery claim | Readiness check, before/after measurement, original fault recurrence on rollback, and reapply | Readiness is a narrow health proxy; no end-to-end SLO check |
 | Secret leakage in Git | `.gitignore` excludes credentials and generated private reports | Users must still review patches and logs before committing |
 | Ungated benchmark causes harm | Comparator runs solely in in-memory simulation | Results are fixture behavior, not real attack rates |
 

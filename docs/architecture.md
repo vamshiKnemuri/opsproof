@@ -10,7 +10,7 @@ flowchart LR
     P -->|approved| R[Fixed-argv Kind rehearsal]
     P -->|rejected| X[Block and report]
     R --> V[Readiness and side-effect checks]
-    V --> B[Rollback test and reapply]
+    V --> B[Restore original fault and reapply]
     B --> O[Evidence report and GitOps patch]
     O --> H[Human review boundary]
 ```
