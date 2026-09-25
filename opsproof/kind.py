@@ -8,8 +8,8 @@ from typing import Any
 
 from .agent import MockAgent, OllamaAdapter
 from .incidents import INCIDENTS, INJECTION
-from .models import Action, Evidence, Observation
-from .policy import PolicyContext, evaluate
+from .models import Action, Evidence, Observation, ValidationError
+from .policy import PolicyContext, PolicyDecision, evaluate
 
 ROOT = Path(__file__).resolve().parents[1]
 NAMESPACE = "opsproof-lab"
@@ -122,6 +122,8 @@ def collect(name: str) -> Evidence:
         reason = "ImagePullBackOff"
     elif "CrashLoopBackOff" in reasons or "BackOff" in event_text:
         reason = "CrashLoopBackOff"
+    elif "Error" in reasons:
+        reason = "ContainerError"
     else:
         reason = ", ".join(sorted(set(reasons))) or "Unknown"
     log_parts = []
@@ -140,7 +142,7 @@ def collect(name: str) -> Evidence:
     observations = [
         Observation("health-1", "health", "Deployment readiness", {"available_replicas": dep.get("status", {}).get("availableReplicas", 0)}),
         Observation("events-1", "events", event_text[-2000:], {"reason": reason}),
-        Observation("logs-1", "logs", logs[-2000:], {"reason": "crash" if "OPS_MODE crash" in logs else "unknown"}),
+        Observation("logs-1", "logs", logs[-2000:], {}),
         Observation("metrics-1", "metrics", "Pod restart count, configured limit, and best-effort live usage",
                     {"memory_limit_mib": spec["memory_mib"],
                      "restart_count": sum(cs.get("restartCount", 0) for p in pods.get("items", [])
@@ -160,15 +162,14 @@ def _incident_observed(name: str, evidence: Evidence) -> bool:
     if signals.get("health", {}).get("available_replicas", 1) != 0:
         return False
     event_reason = signals.get("events", {}).get("reason")
-    log_reason = signals.get("logs", {}).get("reason")
     if name == "bad-image":
         return event_reason == "ImagePullBackOff"
     if name == "oom":
         return event_reason == "OOMKilled"
     if name == "prompt-injection":
-        return (event_reason == "CrashLoopBackOff" or log_reason == "crash") and any(
+        return event_reason in ("CrashLoopBackOff", "ContainerError") and any(
             INJECTION in item for item in evidence.untrusted_text)
-    return event_reason == "CrashLoopBackOff" or log_reason == "crash"
+    return event_reason in ("CrashLoopBackOff", "ContainerError")
 
 
 def _await_incident_evidence(name: str, timeout_seconds: int = 90) -> Evidence:
@@ -242,12 +243,12 @@ def rehearse(action: Action) -> dict[str, Any]:
     _apply_snapshot(after_spec)
     if recovery:
         _kubectl("rollout", "status", f"deployment/{DEPLOYMENT}", "--timeout=90s", timeout=100)
-    final = measure()
+    final_spec, final = snapshot(), measure()
     return {"before": before, "after": after, "recovery": recovery,
             "side_effects": side_effects, "rollback": {"succeeded": rollback_ok,
             "restored_incident_state": rollback_spec == before_spec,
             "restored_incident_unavailable": restored_incident_unavailable,
-            "reapplied_recovery": final["service_healthy"]},
+            "reapplied_recovery": final["service_healthy"] and final_spec == after_spec},
             "change_diff": {key: {"before": before_spec[key], "after": after_spec[key]}
                             for key in before_spec if before_spec[key] != after_spec[key]},
             "time_to_recovery_seconds": elapsed, "time_basis": "wall clock from action to rollout verification",
@@ -264,8 +265,13 @@ def run(name: str, agent=None) -> dict[str, Any]:
                                    current_memory_mib=current["memory_mib"],
                                    previous_revision_available=next(o for o in evidence.observations
                                                                     if o.source == "history").data["previous_revision_available"])
-    decision = (agent or MockAgent()).decide(evidence)
-    verdict = evaluate(decision.action, evidence, policy_context)
+    try:
+        decision = (agent or MockAgent()).decide(evidence)
+        verdict = evaluate(decision.action, evidence, policy_context)
+        diagnosis, proposed_action, trace = decision.diagnosis, decision.action.to_dict(), list(decision.trace)
+    except (ValidationError, KeyError, TypeError) as exc:
+        verdict = PolicyDecision(False, (f"invalid agent decision: {exc}",))
+        diagnosis, proposed_action, trace = "No valid diagnosis", {}, [f"Decision rejected: {exc}"]
     if not verdict.allowed:
         before = measure()
         result = {"before": before, "after": before, "recovery": False, "side_effects": [],
@@ -277,6 +283,6 @@ def run(name: str, agent=None) -> dict[str, Any]:
         "ollama" if isinstance(agent, OllamaAdapter) else "openai")
     return {"incident": name, "backend": "kind", "agent_type": agent_type,
             "cause_fixture": INCIDENTS[name].cause, "recovery_check": INCIDENTS[name].recovery_check,
-            "evidence": evidence.to_dict(), "diagnosis": decision.diagnosis,
-            "proposed_action": decision.action.to_dict(), "policy_decision": verdict.to_dict(),
-            "agent_trace": list(decision.trace), **result}
+            "evidence": evidence.to_dict(), "diagnosis": diagnosis,
+            "proposed_action": proposed_action, "policy_decision": verdict.to_dict(),
+            "agent_trace": trace, **result}

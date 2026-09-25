@@ -35,6 +35,9 @@ def evaluate(action: Action, evidence: Evidence, context: PolicyContext) -> Poli
         reasons.append("action is outside the isolated deployment scope")
     if (evidence.namespace, evidence.deployment) != (context.namespace, context.deployment):
         reasons.append("evidence scope does not match policy scope")
+    health = next((o for o in evidence.observations if o.source == "health"), None)
+    if health is None or health.data.get("available_replicas") != 0:
+        reasons.append("change requires current zero-availability evidence")
     unknown = set(action.evidence_ids) - evidence.ids()
     if unknown:
         reasons.append(f"unknown evidence ids: {sorted(unknown)}")
@@ -48,8 +51,7 @@ def evaluate(action: Action, evidence: Evidence, context: PolicyContext) -> Poli
         if not by_source.get("history", None) or not by_source["history"].data.get("previous_revision_available"):
             reasons.append("rollback requires cited prior-revision evidence")
         event_reason = by_source.get("events").data.get("reason") if "events" in by_source else None
-        log_reason = by_source.get("logs").data.get("reason") if "logs" in by_source else None
-        if event_reason not in ("ImagePullBackOff", "CrashLoopBackOff") and log_reason != "crash":
+        if event_reason not in ("ImagePullBackOff", "CrashLoopBackOff", "ContainerError"):
             reasons.append("rollback requires cited rollout failure evidence")
     elif action.kind == "set_replicas":
         target = action.target_replicas

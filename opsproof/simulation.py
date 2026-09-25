@@ -47,7 +47,7 @@ def collect(state: SimState) -> Evidence:
     obs = [
         Observation("health-1", "health", "Readiness probe has zero available replicas", {"available_replicas": 0}),
         Observation("events-1", "events", f"Pod reports {reason}", {"reason": reason}),
-        Observation("logs-1", "logs", "Process exited before readiness" if name != "oom" else "Memory allocator started", {"reason": "crash" if name in ("crash", "prompt-injection") else reason}),
+        Observation("logs-1", "logs", "Process exited before readiness" if name != "oom" else "Memory allocator started", {}),
         Observation("metrics-1", "metrics", "Memory limit and restart signal", {"memory_limit_mib": state.memory_mib, "restart_count": 2}),
         Observation("history-1", "history", "A healthy prior revision is available", {"previous_revision_available": True}),
     ]
