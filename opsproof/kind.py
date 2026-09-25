@@ -205,16 +205,7 @@ def _apply_action(action: Action) -> None:
         raise ValueError("action kind is not allowlisted")
 
 
-def _wait_for_unavailable(timeout_seconds: int = 45) -> bool:
-    deadline = time.monotonic() + timeout_seconds
-    while time.monotonic() < deadline:
-        if not measure()["service_healthy"]:
-            return True
-        time.sleep(1)
-    return False
-
-
-def rehearse(action: Action) -> dict[str, Any]:
+def rehearse(action: Action, incident: str) -> dict[str, Any]:
     before_spec, before = snapshot(), measure()
     if before["service_healthy"]:
         raise RuntimeError("incident fixture did not remove service availability; recovery cannot be proven")
@@ -238,8 +229,14 @@ def rehearse(action: Action) -> dict[str, Any]:
     # Revert to the exact incident spec, check it, then restore the successful action.
     _apply_snapshot(before_spec)
     rollback_spec = snapshot()
-    restored_incident_unavailable = _wait_for_unavailable()
-    rollback_ok = rollback_spec == before_spec and restored_incident_unavailable
+    rollback_error = None
+    try:
+        _await_incident_evidence(incident)
+        restored_incident_observed = True
+    except RuntimeError as exc:
+        rollback_error = str(exc)
+        restored_incident_observed = False
+    rollback_ok = rollback_spec == before_spec and restored_incident_observed
     _apply_snapshot(after_spec)
     if recovery:
         _kubectl("rollout", "status", f"deployment/{DEPLOYMENT}", "--timeout=90s", timeout=100)
@@ -247,7 +244,9 @@ def rehearse(action: Action) -> dict[str, Any]:
     return {"before": before, "after": after, "recovery": recovery,
             "side_effects": side_effects, "rollback": {"succeeded": rollback_ok,
             "restored_incident_state": rollback_spec == before_spec,
-            "restored_incident_unavailable": restored_incident_unavailable,
+            "restored_incident_unavailable": restored_incident_observed,
+            "restored_incident_evidence": restored_incident_observed,
+            "error": rollback_error,
             "reapplied_recovery": final["service_healthy"] and final_spec == after_spec},
             "change_diff": {key: {"before": before_spec[key], "after": after_spec[key]}
                             for key in before_spec if before_spec[key] != after_spec[key]},
@@ -278,7 +277,7 @@ def run(name: str, agent=None) -> dict[str, Any]:
                   "rollback": {"succeeded": None}, "change_diff": {}, "time_to_recovery_seconds": None,
                   "time_basis": "wall clock from action to rollout verification"}
     else:
-        result = rehearse(decision.action)
+        result = rehearse(decision.action, name)
     agent_type = "mock" if agent is None or isinstance(agent, MockAgent) else (
         "ollama" if isinstance(agent, OllamaAdapter) else "openai")
     return {"incident": name, "backend": "kind", "agent_type": agent_type,

@@ -242,8 +242,29 @@ class WorkflowTests(unittest.TestCase):
             with patch.object(kind, "measure", return_value={"service_healthy": True}):
                 with patch.object(kind, "_apply_action") as execute:
                     with self.assertRaisesRegex(RuntimeError, "did not remove service availability"):
-                        kind.rehearse(action)
+                        kind.rehearse(action, "bad-image")
                     execute.assert_not_called()
+
+    def test_kind_rollback_requires_fault_to_reappear(self):
+        from opsproof import kind
+        action = MockAgent().decide(collect(fixture("bad-image"))).action
+        incident_spec = {"image": "opsproof/app:missing", "mode": "normal", "memory_mib": 128, "replicas": 1}
+        recovered_spec = {**incident_spec, "image": "opsproof/app:stable"}
+        unavailable = {"service_healthy": False, "available_replicas": 0}
+        available = {"service_healthy": True, "available_replicas": 1}
+        with patch.object(kind, "snapshot", side_effect=[incident_spec, recovered_spec, incident_spec, recovered_spec]):
+            with patch.object(kind, "measure", side_effect=[unavailable, available, available]):
+                with patch.object(kind, "_apply_action"):
+                    with patch.object(kind, "_apply_snapshot"):
+                        with patch.object(kind, "_kubectl", return_value=""):
+                            with patch.object(kind, "_get_json", return_value={"items": [{"metadata": {"name": kind.DEPLOYMENT}}]}):
+                                with patch.object(kind, "_await_incident_evidence", side_effect=RuntimeError("fault not observed")):
+                                    report = kind.rehearse(action, "bad-image")
+        self.assertTrue(report["recovery"])
+        self.assertFalse(report["rollback"]["succeeded"])
+        self.assertFalse(report["rollback"]["restored_incident_evidence"])
+        self.assertIsNone(change_patch({"proposed_action": action.to_dict(),
+                                        "policy_decision": {"allowed": True}, **report}))
 
     def test_kind_waits_for_structured_fault_before_diagnosis(self):
         from opsproof import kind
