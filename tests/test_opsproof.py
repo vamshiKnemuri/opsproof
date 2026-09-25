@@ -26,9 +26,21 @@ class ActionValidationTests(unittest.TestCase):
                 Action.parse(candidate)
 
     def test_rejects_bool_and_wrong_parameter(self):
-        for candidate in ({**self.raw, "memory_mib": True}, {**self.raw, "target_replicas": 2}):
+        for candidate in ({**self.raw, "memory_mib": True}, {**self.raw, "target_replicas": 2},
+                          {**self.raw, "target_replicas": None},
+                          {**self.raw, "kind": "deployment_rollback", "memory_mib": None}):
             with self.assertRaises(ValidationError):
                 Action.parse(candidate)
+
+    def test_action_wire_shape_round_trips(self):
+        for raw in (self.raw,
+                    {**self.raw, "kind": "deployment_rollback"},
+                    {**self.raw, "kind": "set_replicas", "target_replicas": 2}):
+            raw = {key: value for key, value in raw.items()
+                   if key != "memory_mib" or raw["kind"] == "set_memory_limit"}
+            with self.subTest(kind=raw["kind"]):
+                action = Action.parse(raw)
+                self.assertEqual(Action.parse(action.to_dict()), action)
 
     def test_bounds_scope_and_evidence(self):
         evidence = collect(fixture("oom"))

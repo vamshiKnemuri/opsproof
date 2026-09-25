@@ -48,18 +48,22 @@ class Action:
         replicas = raw.get("target_replicas")
         memory = raw.get("memory_mib")
         if kind == "set_replicas":
-            if type(replicas) is not int or memory is not None:
+            if type(replicas) is not int or "memory_mib" in raw:
                 raise ValidationError("set_replicas requires only integer target_replicas")
         elif kind == "set_memory_limit":
-            if type(memory) is not int or replicas is not None:
+            if type(memory) is not int or "target_replicas" in raw:
                 raise ValidationError("set_memory_limit requires only integer memory_mib")
-        elif replicas is not None or memory is not None:
+        elif "target_replicas" in raw or "memory_mib" in raw:
             raise ValidationError("rollback takes no numeric parameter")
         return cls(kind, raw["namespace"], raw["deployment"], raw["reason"], tuple(ids), replicas, memory)
 
     def to_dict(self) -> dict[str, Any]:
         value = asdict(self)
         value["evidence_ids"] = list(self.evidence_ids)
+        if self.kind != "set_replicas":
+            value.pop("target_replicas")
+        if self.kind != "set_memory_limit":
+            value.pop("memory_mib")
         return value
 
 

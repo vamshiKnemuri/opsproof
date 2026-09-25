@@ -73,4 +73,6 @@ def evaluate(action: Action, evidence: Evidence, context: PolicyContext) -> Poli
             reasons.append("memory adjustment requires cited OOMKilled event")
         if "metrics" not in by_source or by_source["metrics"].data.get("memory_limit_mib") != context.current_memory_mib:
             reasons.append("memory adjustment requires cited current limit")
+    else:
+        reasons.append("action kind is not allowlisted")
     return PolicyDecision(not reasons, tuple(reasons) if reasons else ("allowed in isolated lab scope",))

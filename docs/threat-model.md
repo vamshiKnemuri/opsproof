@@ -6,7 +6,7 @@ The protected assets are production clusters, the lab's availability, operationa
 
 | Threat | Control | Residual limitation |
 |---|---|---|
-| Prompt injection in app logs or runbooks | Treat text as data; parser rejects non-allowlisted kinds; policy uses structured signals | A real model may still produce a bad but schema-valid proposal; no real-model robustness claim |
+| Prompt injection in app logs or runbooks | Treat text as data; parser rejects non-allowlisted kinds; policy requires cited Kubernetes status rather than a crash phrase in logs | A real model may still produce a bad but schema-valid proposal; no general robustness claim |
 | Model emits shell or YAML | Extra-field rejection and fixed command mapping | A bug in the executor would still matter; review/tests remain necessary |
 | Scope confusion or context drift | Dedicated `kind-opsproof` context, pinned namespace/deployment, no production context in policy | A malicious local kubectl binary or altered Kind context is outside this lab's guarantee |
 | Disruptive scale or resource change | Minimum one replica, maximum three, delta at most one, fixed memory values and ceiling | One replica can still have downtime during rollout |
