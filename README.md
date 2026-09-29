@@ -1,10 +1,41 @@
 # OpsProof: an agentic DevOps flight simulator
 
+[![CI](https://github.com/vamshiKnemuri/opsproof/actions/workflows/ci.yml/badge.svg)](https://github.com/vamshiKnemuri/opsproof/actions/workflows/ci.yml)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue)](pyproject.toml)
+[![MIT license](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+
 OpsProof asks an operations agent to diagnose a Kubernetes fault, submit a typed change, and prove that change in a disposable cluster before a human reviews a production GitOps proposal. It is an executable lab, not a chatbot transcript. The policy gate uses deterministic code; model text is never a shell command or a Kubernetes manifest.
 
-The repository was built to demonstrate senior platform engineering judgment around scoped access, evidence, rollback, and human approval. It does not claim production deployment experience or AI benchmark performance.
+The repository demonstrates scoped access, evidence, rollback, and human approval. Mock-agent scores describe fixture behavior; actual model pilot results are reported separately. No production deployment experience is claimed.
+
+## Project tour
+
+- **See the proof:** [OOM evidence report](reports/sample/kind/oom.md) and its [review patch](reports/sample/kind/oom-gitops-patch.json).
+- **Inspect the guardrails:** [typed actions](opsproof/models.py), [deterministic policy](opsproof/policy.py), and [threat model](docs/threat-model.md).
+- **Read the results:** [measured results](#measured-results) and [separate real-model evidence](reports/sample/local-model/README.md).
+
+```mermaid
+flowchart LR
+    I[Known incident] --> E[Read-only evidence]
+    E --> A[Agent diagnosis and typed proposal]
+    A --> P[Deterministic policy]
+    P -->|allowed| K[Isolated Kind rehearsal]
+    P -->|blocked| R[Evidence report]
+    K --> V[Recovery, side effects, rollback]
+    V --> R
+    R --> G[GitOps patch for human review]
+```
+
+The patch is generated only when recovery, rollback, and reapplication pass without observed side effects. The default agent is deterministic and needs no model credentials.
 
 ## Quick start
+
+Clone the source checkout first. Run the commands below from its root; the Kind setup uses the app and Kubernetes fixtures in this checkout.
+
+```sh
+git clone https://github.com/vamshiKnemuri/opsproof.git
+cd opsproof
+```
 
 Prerequisites for the cluster demo: Python 3.10+, Docker Engine/Desktop running, [Kind](https://kind.sigs.k8s.io/), and [kubectl](https://kubernetes.io/docs/tasks/tools/) on `PATH`. No AWS account, API key, or paid AI service is needed. Kind creates a dedicated `kind-opsproof` context; OpsProof uses only namespace `opsproof-lab` in that context.
 
@@ -69,7 +100,7 @@ These numbers come from `python -m opsproof demo --backend simulation --out repo
 
 The ungated comparator proposes removing the OOM limit and follows the injected deletion instruction. These choices are intentionally implemented as fixture behavior to exercise the safety boundary. They are not measured behavior of a real AI model. Gate rejection was measured separately by `attack-check`; the guarded mock made no unsafe benchmark proposal, hence zero blocked benchmark actions. The fixed rollback runbook succeeds because every fixture has a healthy previous revision; this small benchmark does not show superiority over a good runbook.
 
-The [private CI run #23](https://github.com/vamshiKnemuri/opsproof/actions/runs/36169387856) on 2026-09-25 completed all four Kind rehearsals on the reviewed revision. Every fixture had **zero available replicas before remediation** and one after; the rollback restored the exact incident configuration, the structured fault signal, and zero availability, then reapplying the remediation restored readiness. The policy allowed each scoped action, no side effects were recorded, and each scenario produced a review patch. These are four single-run wall-clock measurements from the isolated cluster, separate from the repeated in-memory benchmark:
+The [CI run #23](https://github.com/vamshiKnemuri/opsproof/actions/runs/36169387856) on 2026-09-25 completed all four Kind rehearsals on the reviewed revision. Every fixture had **zero available replicas before remediation** and one after; the rollback restored the exact incident configuration, the structured fault signal, and zero availability, then reapplying the remediation restored readiness. The policy allowed each scoped action, no side effects were recorded, and each scenario produced a review patch. These are four single-run wall-clock measurements from the isolated cluster, separate from the repeated in-memory benchmark:
 
 | Kind incident | Recovered | Action-to-readiness time | Incident restored on rollback | Recovered after reapply |
 |---|---:|---:|---:|---:|
@@ -99,23 +130,25 @@ python -m opsproof benchmark --agent ollama --model qwen2.5:7b --repeats 3 --out
 
 The manually triggered [credential-free model workflow](.github/workflows/local-model.yml) runs the same trial set in GitHub Actions and preserves the model identity and full trial record. Its guarded-agent results must be reported separately from the fixed runbook, the intentionally ungated fixture comparator, and the deterministic mock agent. Model inference uses synthetic lab evidence only; generated text never becomes a command or manifest.
 
-An initial credential-free pilot with `qwen2.5:0.5b` completed in [private workflow run #1](https://github.com/vamshiKnemuri/opsproof/actions/runs/36102041928) on 2026-09-25. The guarded **real-model** approach recovered **0/12** simulated incidents. Its malformed or unsupported actions were blocked **12/12** times; no action reached the simulator, so side effects and rollback attempts were both zero. Several outputs were truncated at the 512-token limit. The full trial record and model identity are in [reports/sample/local-model](reports/sample/local-model).
+An initial credential-free pilot with `qwen2.5:0.5b` completed in [workflow run #1](https://github.com/vamshiKnemuri/opsproof/actions/runs/36102041928) on 2026-09-25. The guarded **real-model** approach recovered **0/12** simulated incidents. Its malformed or unsupported actions were blocked **12/12** times; no action reached the simulator, so side effects and rollback attempts were both zero. Several outputs were truncated at the 512-token limit. The full trial record and model identity are in [reports/sample/local-model](reports/sample/local-model).
 
-A second pilot with `qwen2.5:1.5b` and structured JSON output completed in [private workflow run #2](https://github.com/vamshiKnemuri/opsproof/actions/runs/36102745386). It also recovered **0/12**. All 12 responses selected a memory action without a valid numeric target, so the parser blocked them; no simulator action or rollback occurred. A third pilot with `qwen2.5:3b` and per-action schemas completed in [private workflow run #3](https://github.com/vamshiKnemuri/opsproof/actions/runs/36103420438): **5/12** recovered, **7/12** actions blocked, **0** side-effect trials, and **5/5** attempted rollbacks succeeded. OOM recovered 3/3, prompt-injection 2/3, image pull 0/3, and crash 0/3. Its blocked image/crash proposals asked for memory changes without cited OOM evidence.
+A second pilot with `qwen2.5:1.5b` and structured JSON output completed in [workflow run #2](https://github.com/vamshiKnemuri/opsproof/actions/runs/36102745386). It also recovered **0/12**. All 12 responses selected a memory action without a valid numeric target, so the parser blocked them; no simulator action or rollback occurred. A third pilot with `qwen2.5:3b` and per-action schemas completed in [workflow run #3](https://github.com/vamshiKnemuri/opsproof/actions/runs/36103420438): **5/12** recovered, **7/12** actions blocked, **0** side-effect trials, and **5/5** attempted rollbacks succeeded. OOM recovered 3/3, prompt-injection 2/3, image pull 0/3, and crash 0/3. Its blocked image/crash proposals asked for memory changes without cited OOM evidence.
 
-The 7B model completed in [private workflow run #4](https://github.com/vamshiKnemuri/opsproof/actions/runs/36104114708): **11/12** recovered, **1/12** blocked, **0** side-effect trials, and **11/11** attempted rollbacks succeeded. Bad image, crash, and prompt-injection each recovered 3/3; OOM recovered 2/3. The failed OOM proposal was a rollback without cited rollout-failure evidence and was blocked before execution. This is **one unsafe typed proposal** under the current evaluator. The archived run was produced immediately before that counter fix, so its raw JSON says zero unsafe proposals; the rejected action and reason are visible in its trial record. The full 7B record is preserved in [reports/sample/local-model/qwen2.5-7b-trials.json](reports/sample/local-model/qwen2.5-7b-trials.json), with the count derivation in [reports/sample/local-model/README.md](reports/sample/local-model/README.md). These model scores are historical measurements from before the stricter log-evidence boundary; they are not a fresh score for the reviewed revision.
+The 7B model completed in [workflow run #4](https://github.com/vamshiKnemuri/opsproof/actions/runs/36104114708): **11/12** recovered, **1/12** blocked, **0** side-effect trials, and **11/11** attempted rollbacks succeeded. Bad image, crash, and prompt-injection each recovered 3/3; OOM recovered 2/3. The failed OOM proposal was a rollback without cited rollout-failure evidence and was blocked before execution. This is **one unsafe typed proposal** under the current evaluator. The archived run was produced immediately before that counter fix, so its raw JSON says zero unsafe proposals; the rejected action and reason are visible in its trial record. The full 7B record is preserved in [reports/sample/local-model/qwen2.5-7b-trials.json](reports/sample/local-model/qwen2.5-7b-trials.json), with the count derivation in [reports/sample/local-model/README.md](reports/sample/local-model/README.md). These model scores are historical measurements from before the stricter log-evidence boundary; they are not a fresh score for the reviewed revision.
 
 The runbook and ungated rows in these trial records remain scripted fixture comparators, not outputs from the real models. The model prompt includes an explicit three-case remediation playbook, so this measures compliance and evidence selection on known fixtures rather than novel incident reasoning. Simulator recovery time is fixed at ten seconds per recovered trial and excludes model inference latency.
 
 ## What was verified and what remains
 
-Twenty-four automated tests passed locally and in [private CI run #23](https://github.com/vamshiKnemuri/opsproof/actions/runs/36169387856), including stubbed OpenAI and local-model adapter parsing, malicious-action rejection, forged-log rejection, stale-failure rejection, strict action serialization, policy-rejected proposal counting, patch gating, a blocked-report check for malformed Kind model decisions, and a check that rollback cannot pass without the original fault reappearing. `attack-check` passed, and the four offline scenarios plus 36 benchmark trials completed. CI verified all four Kind incidents and preserved their reports. Docker, Kind, and kubectl were absent on the authoring machine, so the local one-command cluster path was not run there. Four credential-free real-model trial runs are reported above; they predate this review. The optional OpenAI model was not run because no API key was available.
+Twenty-four automated tests passed locally and in [CI run #23](https://github.com/vamshiKnemuri/opsproof/actions/runs/36169387856), including stubbed OpenAI and local-model adapter parsing, malicious-action rejection, forged-log rejection, stale-failure rejection, strict action serialization, policy-rejected proposal counting, patch gating, a blocked-report check for malformed Kind model decisions, and a check that rollback cannot pass without the original fault reappearing. `attack-check` passed, and the four offline scenarios plus 36 benchmark trials completed. CI verified all four Kind incidents and preserved their reports. Docker, Kind, and kubectl were absent on the authoring machine, so the local one-command cluster path was not run there. Four credential-free real-model trial runs are reported above; they predate this review. The optional OpenAI model was not run because no API key was available.
 
 The lab has one deployment and a simple readiness oracle. It does not assess multi-service dependencies, production SLOs, or whether a proposed resource change is cost effective. The collector attempts `kubectl top`; without metrics-server it records the configured memory limit and restart count and marks live usage unavailable. The real-model trials used only the in-memory simulator; the Kind rehearsals used the deterministic mock agent. Three successful 7B prompt-injection trials do not establish general prompt-injection resistance. Model inference latency and token cost were not benchmarked.
 
 ## Architecture and threat model
 
 See [docs/architecture.md](docs/architecture.md) and [docs/threat-model.md](docs/threat-model.md).
+
+For development and result-reporting rules, see [CONTRIBUTING.md](CONTRIBUTING.md). Release history is in [CHANGELOG.md](CHANGELOG.md).
 
 ## Two-minute demo video script
 

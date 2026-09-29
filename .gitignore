@@ -9,3 +9,5 @@ __pycache__/
 reports/generated/
 reports/real-model/
 changes/generated/
+# Personal local document; never part of the project or its release.
+/KRISHNA_N.docx
